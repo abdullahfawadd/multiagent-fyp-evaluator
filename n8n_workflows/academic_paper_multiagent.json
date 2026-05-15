@@ -1,0 +1,308 @@
+{
+  "name": "Academic Paper Multi-Agent Reviewer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "academic-paper-multiagent",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "f8c93cf4-03d5-4e03-bc1a-1d7a7ff18c01",
+      "name": "Webhook - Paper Submission",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -760,
+        0
+      ],
+      "webhookId": "academic-paper-multiagent"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GROQ_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"temperature\": 0.2,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the orchestrator in a Hub-and-Spoke academic paper review workflow. Decide which exactly two specialists should review this submission. For this workflow, always route to Methodology Reviewer and Contribution Reviewer. Return JSON with agent_names and routing_reason.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Paper submission: \" + JSON.stringify($json.body || $json)\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "a86f4eca-1dcb-4b97-b653-153e95b3f100",
+      "name": "Orchestrator - Select Specialists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const paper = $('Webhook - Paper Submission').first().json.body || $('Webhook - Paper Submission').first().json;\nconst methodology = String(paper.methodology || '');\nconst design = String(paper.study_design || '').toLowerCase();\nconst sampleSize = Number(paper.sample_size || 0);\nlet verdict = 'needs_detail';\nif (methodology.length > 120 && sampleSize >= 30 && design) verdict = 'methodology_plausible';\nif (sampleSize > 0 && sampleSize < 20) verdict = 'sample_too_small';\nreturn [{\n  json: {\n    tool_name: 'methodology_quality_lookup',\n    verdict,\n    sample_size: sampleSize,\n    study_design: paper.study_design || 'not provided',\n    evidence: 'Checks methodology length, study design presence, and sample-size reasonableness.'\n  }\n}];"
+      },
+      "id": "97c965eb-f6da-45d1-9290-80e724d2ea7a",
+      "name": "Tool - Methodology Quality Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const paper = $('Webhook - Paper Submission').first().json.body || $('Webhook - Paper Submission').first().json;\nconst gap = String(paper.research_gap || '').toLowerCase();\nconst keywords = Array.isArray(paper.keywords) ? paper.keywords : String(paper.keywords || '').split(',').map(k => k.trim()).filter(Boolean);\nconst crowded = ['chatbot', 'sentiment analysis', 'fake news', 'recommendation system'];\nconst overlap = keywords.filter(k => crowded.includes(String(k).toLowerCase()));\nreturn [{\n  json: {\n    tool_name: 'contribution_gap_lookup',\n    crowded_topic_matches: overlap,\n    gap_strength: gap.length > 100 ? 'clear_gap_claim' : 'weak_gap_claim',\n    evidence: overlap.length ? 'Topic overlaps with common paper/project areas; contribution must be sharply differentiated.' : 'No obvious crowded-topic keyword match in the hardcoded database.'\n  }\n}];"
+      },
+      "id": "b138a5cf-702b-433a-9e73-ad3c17a4d13f",
+      "name": "Tool - Contribution Gap Lookup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GROQ_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"temperature\": 0.2,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Methodology Reviewer specialist. You only review research design, validity, sample size, method clarity, and threats to validity. Use the provided Code tool output as evidence. Do not assess novelty or contribution.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Paper: \" + JSON.stringify($('Webhook - Paper Submission').first().json.body || $('Webhook - Paper Submission').first().json) + \"\\nTool evidence: \" + JSON.stringify($json)\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "e69831ed-5111-487c-8132-05b42d1e474e",
+      "name": "Agent - Methodology Reviewer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        20,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GROQ_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"temperature\": 0.2,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the Contribution Reviewer specialist. You only review novelty, research gap justification, expected contribution, and positioning against existing work. Use the provided Code tool output as evidence. Do not assess methodology quality.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Paper: \" + JSON.stringify($('Webhook - Paper Submission').first().json.body || $('Webhook - Paper Submission').first().json) + \"\\nTool evidence: \" + JSON.stringify($json)\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "6e034bd8-2c04-49ac-a8d3-950f0992d797",
+      "name": "Agent - Contribution Reviewer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        20,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "d129d6e1-1fef-4f92-a272-ee724c3ff4ea",
+      "name": "Merge - Specialist Reports",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.GROQ_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"temperature\": 0.2,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the synthesis agent. Combine the Methodology Reviewer and Contribution Reviewer reports into one final academic paper review. Do not introduce unrelated review dimensions.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Methodology report: \" + ($('Agent - Methodology Reviewer').first().json.choices?.[0]?.message?.content || JSON.stringify($('Agent - Methodology Reviewer').first().json)) + \"\\n\\nContribution report: \" + ($('Agent - Contribution Reviewer').first().json.choices?.[0]?.message?.content || JSON.stringify($('Agent - Contribution Reviewer').first().json))\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "c7f4ec83-037d-4876-b75d-21c86c04a52e",
+      "name": "Synthesis Agent - Final Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        540,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"specialist_1_output\": $('Agent - Methodology Reviewer').first().json.choices?.[0]?.message?.content || $('Agent - Methodology Reviewer').first().json,\n  \"specialist_2_output\": $('Agent - Contribution Reviewer').first().json.choices?.[0]?.message?.content || $('Agent - Contribution Reviewer').first().json,\n  \"synthesis\": $('Synthesis Agent - Final Review').first().json.choices?.[0]?.message?.content || $('Synthesis Agent - Final Review').first().json,\n  \"agent_names\": [\"Methodology Reviewer\", \"Contribution Reviewer\"]\n}",
+        "options": {}
+      },
+      "id": "e2dba67f-ae52-4191-9290-679a7bff73a2",
+      "name": "Respond - Multi-Agent Review",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        800,
+        0
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Paper Submission": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator - Select Specialists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator - Select Specialists": {
+      "main": [
+        [
+          {
+            "node": "Tool - Methodology Quality Lookup",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Tool - Contribution Gap Lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool - Methodology Quality Lookup": {
+      "main": [
+        [
+          {
+            "node": "Agent - Methodology Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool - Contribution Gap Lookup": {
+      "main": [
+        [
+          {
+            "node": "Agent - Contribution Reviewer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent - Methodology Reviewer": {
+      "main": [
+        [
+          {
+            "node": "Merge - Specialist Reports",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent - Contribution Reviewer": {
+      "main": [
+        [
+          {
+            "node": "Merge - Specialist Reports",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge - Specialist Reports": {
+      "main": [
+        [
+          {
+            "node": "Synthesis Agent - Final Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthesis Agent - Final Review": {
+      "main": [
+        [
+          {
+            "node": "Respond - Multi-Agent Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "46b8d0f0-3dc9-4f2c-b43d-d23da081b942",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "academic-paper-multiagent",
+  "tags": []
+}
