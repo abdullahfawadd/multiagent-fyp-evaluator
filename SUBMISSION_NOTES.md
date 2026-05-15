@@ -13,13 +13,13 @@
 
 ## Timing Comparison
 
-Local verification timings from this workspace, using the built-in fallback path because no `.env` key was committed:
+Live verification timings from this workspace after adding `GROQ_API_KEY` to local ignored `.env`:
 
-- Sequential `/evaluate`: `0.001` seconds
-- Parallel `/evaluate/parallel`: `0.003` seconds
-- Speedup ratio: `0.001 / 0.003 = 0.33`
+- Sequential `/evaluate`: `55.094` seconds
+- Parallel `/evaluate/parallel`: `61.125` seconds
+- Speedup ratio: `55.094 / 61.125 = 0.90`
 
-These fallback timings only prove endpoint behavior. For the lab demo, add `GROQ_API_KEY` to local `.env`, rerun both endpoints with the strong proposal, and replace the numbers above with live Groq timings. If Groq free-tier rate limits slow the parallel endpoint, mention that parallelism is bounded by the slowest shared external dependency.
+The direct Groq API key check passed. In this run, parallel mode was not faster because the Groq free-tier/shared external dependency became the bottleneck during many LLM calls. This is valid to explain in the lab demo: parallelism is bounded by the slowest and most rate-limited dependency.
 
 ## Ethics Specialist Demonstration Proposal
 
