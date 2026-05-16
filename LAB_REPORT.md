@@ -36,15 +36,30 @@ The orchestrator is the hub. It receives the full FYP proposal, extracts isolate
 
 The specialists are the spokes. Each specialist only receives the information required for its own task.
 
-```text
-                         ORCHESTRATOR
-               coordination, conflict detection,
-                    final synthesis only
-                              |
-        -------------------------------------------------
-        |                  |                  |          |
-Technical Reviewer   Novelty Assessor   Feasibility   Ethics Reviewer
-  Reflection           Tool Use            ReAct        Reflection
+```mermaid
+flowchart TB
+    proposal["Full FYP Proposal"]
+    orchestrator["Orchestrator<br/>Coordination, conflict detection,<br/>and final synthesis only"]
+
+    technical["Technical Reviewer<br/>Reflection Pattern"]
+    novelty["Novelty Assessor<br/>Tool Use Pattern"]
+    feasibility["Feasibility Analyst<br/>ReAct Pattern"]
+    ethics["Ethics Reviewer<br/>Reflection Pattern"]
+
+    final["Unified Evaluation Report<br/>Verdict, strengths, concerns,<br/>recommendations, and conflicts"]
+
+    proposal --> orchestrator
+    orchestrator --> technical
+    orchestrator --> novelty
+    orchestrator --> feasibility
+    orchestrator --> ethics
+
+    technical --> orchestrator
+    novelty --> orchestrator
+    feasibility --> orchestrator
+    ethics --> orchestrator
+
+    orchestrator --> final
 ```
 
 The orchestrator never performs domain work itself. It does not judge technical quality, novelty, feasibility, or ethics directly. It only combines the specialist reports.
