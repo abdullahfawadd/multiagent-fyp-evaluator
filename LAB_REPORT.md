@@ -562,7 +562,99 @@ The workflow uses HTTP Request nodes and reads:
 
 Set `GROQ_API_KEY` in your n8n environment before running the workflow.
 
-### 17.3 n8n Webhook Test Body
+If you are running n8n locally from PowerShell, start it with the environment variable available:
+
+```powershell
+$env:GROQ_API_KEY="your_real_groq_key_here"
+npx n8n start
+```
+
+If you are running n8n with Docker, pass the key as an environment variable:
+
+```powershell
+docker run -it --rm `
+  -p 5678:5678 `
+  -e GROQ_API_KEY="your_real_groq_key_here" `
+  n8nio/n8n
+```
+
+If you are using n8n Cloud and cannot set environment variables, open each Groq HTTP Request node and replace the `Authorization` header value with:
+
+```text
+Bearer your_real_groq_key_here
+```
+
+Do this only for the live demo. Do not export or submit a workflow JSON that contains the real key.
+
+### 17.3 Check Imported Workflow Nodes
+
+After importing, confirm that the canvas contains these nodes:
+
+| Node Name | Type | What to Verify |
+| --- | --- | --- |
+| `Webhook - Paper Submission` | Webhook | Method is `POST`, path is `academic-paper-multiagent` |
+| `Orchestrator - Select Specialists` | HTTP Request | Sends request to Groq chat completions |
+| `Tool - Methodology Quality Lookup` | Code | Produces simulated methodology evidence |
+| `Tool - Contribution Gap Lookup` | Code | Produces simulated contribution/novelty evidence |
+| `Agent - Methodology Reviewer` | HTTP Request | Uses only methodology-focused system prompt |
+| `Agent - Contribution Reviewer` | HTTP Request | Uses only contribution-focused system prompt |
+| `Merge - Specialist Reports` | Merge | Combines both specialist branches |
+| `Synthesis Agent - Final Review` | HTTP Request | Combines both specialist reports |
+| `Respond - Multi-Agent Review` | Respond to Webhook | Returns JSON to Postman |
+
+This proves the n8n workflow also follows the Multi-Agent Pattern: webhook input, orchestrator, isolated specialists, tool nodes, synthesis, and response.
+
+### 17.4 Get the Webhook URL
+
+For a test run:
+
+1. Open the workflow in n8n.
+2. Click the **Webhook - Paper Submission** node.
+3. Copy the **Test URL** shown by n8n.
+4. Click **Listen for test event** or **Execute workflow**.
+5. Send the Postman request while n8n is waiting.
+
+The test URL usually looks like this:
+
+```text
+http://localhost:5678/webhook-test/academic-paper-multiagent
+```
+
+For an activated workflow, use the production webhook URL. It usually looks like this:
+
+```text
+http://localhost:5678/webhook/academic-paper-multiagent
+```
+
+Use the exact URL shown inside your n8n Webhook node if it is different.
+
+### 17.5 Postman Test for n8n Workflow
+
+Method:
+
+```text
+POST
+```
+
+URL:
+
+```text
+http://localhost:5678/webhook-test/academic-paper-multiagent
+```
+
+Use the production URL instead if the workflow is active:
+
+```text
+http://localhost:5678/webhook/academic-paper-multiagent
+```
+
+Headers:
+
+```text
+Content-Type: application/json
+```
+
+Body:
 
 Send this JSON to the n8n webhook URL:
 
@@ -589,7 +681,40 @@ Expected n8n response:
 }
 ```
 
-### 17.4 What to Explain During n8n Demo
+### 17.6 What to Verify After Running n8n
+
+On the n8n canvas, confirm that these nodes executed successfully:
+
+- `Webhook - Paper Submission`
+- `Orchestrator - Select Specialists`
+- `Tool - Methodology Quality Lookup`
+- `Tool - Contribution Gap Lookup`
+- `Agent - Methodology Reviewer`
+- `Agent - Contribution Reviewer`
+- `Merge - Specialist Reports`
+- `Synthesis Agent - Final Review`
+- `Respond - Multi-Agent Review`
+
+In the Postman response, confirm:
+
+- `specialist_1_output` is present
+- `specialist_2_output` is present
+- `synthesis` is present
+- `agent_names` contains `Methodology Reviewer` and `Contribution Reviewer`
+
+This is the proof that both specialist agents activated and the synthesis node combined their outputs.
+
+### 17.7 Troubleshooting n8n
+
+| Problem | Likely Cause | Fix |
+| --- | --- | --- |
+| Postman says webhook not registered | Workflow is not listening or not active | Click **Listen for test event** or activate the workflow |
+| Groq returns `401` or invalid API key | `GROQ_API_KEY` is missing in n8n | Set the environment variable or add the header manually for demo |
+| HTTP Request node fails | Internet/API issue or Groq rate limit | Wait and rerun, or test one branch at a time |
+| Response is empty | Respond node did not receive synthesis output | Check that both specialist nodes and the merge node executed |
+| Only one specialist runs | One branch failed before merge | Open the failed node output and fix the error shown there |
+
+### 17.8 What to Explain During n8n Demo
 
 Explain these points:
 
